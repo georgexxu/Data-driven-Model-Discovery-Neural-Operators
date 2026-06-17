@@ -8,6 +8,7 @@ def sample_neumann_grf(N=1024, K=200, L=2 * np.pi, seed=None):
     """
     rng = np.random.default_rng(seed)
 
+
     x = np.linspace(0, L, N + 1)
     u = np.zeros_like(x)
 
