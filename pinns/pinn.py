@@ -11,7 +11,6 @@ print("PyTorch:", torch.__version__)
 torch.set_default_dtype(torch.float64)
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-
 class PINN(nn.Module):
     def __init__(self, hidden_size, activation="tanh", relu_k=1):
         super().__init__()

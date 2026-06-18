@@ -1,0 +1,218 @@
+\documentclass[10pt]{beamer}
+
+\usetheme{Madrid}
+\usecolortheme{default}
+\usefonttheme{professionalfonts}
+
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{hyperref}
+
+\title[Operator Learning]{Coding tutorial: Neural network optimization for PDEs}
+
+\author[X. Xu]{Xiaofeng Xu\\
+	~\\
+%	{\scriptsize Postdoctoral Scholar, Department of Mathematics, Penn State University
+%	}
+%	\\
+%	~\\
+}
+
+\institute[PSU]{Postdoctoral Scholar,\\
+Department of Mathematics, Penn State University\\
+%\textcolor{blue}{\tt xiaofeng.xu@kaust.edu.sa }
+}
+
+\date[June 18]{OneMath World School \\
+Brin Mathematical Research Center\\
+University of Maryland\\
+June 18, 2026}
+
+\begin{document}
+
+\begin{frame}
+	\titlepage
+	{
+		\scriptsize
+%		\vspace{-0.5cm}
+%		\begin{center}
+%			\large     Joint work with Prof. Jinchao Xu, Dr. Jongho Park
+%		\end{center}
+%\vspace{-0.5cm}
+%			\centerline{Acknowledgement: }
+%	\centerline{ KAUST Baseline Research Fund}
+		%\begin{figure}
+		%\includegraphics[width=0.08\textwidth, height=0.1\textheight]{figures/NSF_4-Color_bitmap_Logo.png}
+		%\end{figure}
+		
+		%\centerline{{\color{blue}NSF} DMS-2111387, KAUST Baseline Fund}
+%		\centerline{ NSF DMS-2111387, KAUST Baseline Research Fund}
+	}
+\end{frame}
+
+\begin{frame}{Outline}
+	\tableofcontents
+\end{frame}
+
+\section{Introduction}
+
+\begin{frame}{Physics-Informed Neural Networks (PINNs)}
+	\begin{itemize}
+		\item Approximate PDE solutions with a neural network $u_\theta$
+		\item Enforce the governing equation at \textbf{collocation points} via automatic differentiation
+		\item Impose \textbf{homogeneous Dirichlet} boundary conditions exactly using a hard constraint (distance function)
+		\item Train by minimizing the PDE residual; evaluate against a known exact solution
+	\end{itemize}
+\end{frame}
+
+\section{One-Dimensional Elliptic Problem}
+
+\begin{frame}{1D Problem Setting (\texttt{pinn.py})}
+	\textbf{Domain:} $x \in (0,1)$
+
+	\vspace{0.4em}
+	\textbf{PDE:}
+	\[
+		-u''(x) = \sin(\omega x), \qquad \omega = 10,
+	\]
+	equivalently $u''(x) + b(x) = 0$ with source $b(x) = \sin(\omega x)$.
+
+	\vspace{0.4em}
+	\textbf{Boundary conditions:} homogeneous Dirichlet
+	\[
+		u(0) = u(1) = 0.
+	\]
+
+	\vspace{0.4em}
+	\textbf{Exact solution:}
+	\[
+		u_{\mathrm{exact}}(x)
+		= \frac{\sin(\omega x)}{100} - \frac{x\sin(\omega)}{100}.
+	\]
+\end{frame}
+
+\begin{frame}{1D PINN Formulation (\texttt{pinn.py})}
+	\textbf{Hard boundary constraint:}
+	\[
+		u_\theta(x) = x(1-x)\,\widehat{u}_\theta(x),
+	\]
+	so $u_\theta(0)=u_\theta(1)=0$ automatically.
+
+	\vspace{0.4em}
+	\textbf{Network:} $\widehat{u}_\theta \colon \mathbb{R}\to\mathbb{R}$ is a 2-layer MLP,
+	\[
+		1 \xrightarrow{\;\tanh\;} 100 \xrightarrow{\;\mathrm{linear}\;} 1,
+	\]
+	trained in \texttt{float64}.
+
+	\vspace{0.4em}
+	\textbf{Loss:} mean squared PDE residual at $500$ interior collocation points,
+	\[
+		\mathcal{L}(\theta)
+		= \frac{1}{N}\sum_{i=1}^{N}
+		\bigl(u_\theta''(x_i) + \sin(\omega x_i)\bigr)^2.
+	\]
+
+	\vspace{0.4em}
+	\textbf{Optimization:} Adam ($6000$ epochs, $\mathrm{lr}=10^{-3}$), then L-BFGS ($100$ steps).
+	\textbf{Remark:} In lower dimension, you can use a uniform grid as the collocation points, while in higher dimension we have to use (quasi) Monte-Carlo points. 
+\end{frame}
+
+\section{Two-Dimensional Elliptic Problem}
+
+\begin{frame}{2D Problem Setting (\texttt{pinn2d.py})}
+	\textbf{Domain:} $(x,y) \in (0,1)^2$
+
+	\vspace{0.4em}
+	\textbf{PDE:}
+	\[
+		-\Delta u(x,y) = f(x,y), \qquad \omega = 10,
+	\]
+	with Laplacian $\Delta u = u_{xx} + u_{yy}$.
+
+	\vspace{0.4em}
+	\textbf{Boundary conditions:} homogeneous Dirichlet on $\partial(0,1)^2$,
+	\[
+		u = 0 \quad \text{on } x=0,1 \text{ or } y=0,1.
+	\]
+
+	\vspace{0.4em}
+	\textbf{Manufactured solution:}
+	\[
+		u_{\mathrm{exact}}(x,y)
+		= \frac{\sin(\omega x)\sin(\omega y)}{100},
+	\]
+	\[
+		f(x,y)
+		= \frac{2\omega^2\sin(\omega x)\sin(\omega y)}{100}.
+	\]
+\end{frame}
+
+\begin{frame}{2D PINN Formulation (\texttt{pinn2d.py})}
+	\textbf{Hard boundary constraint:}
+	\[
+		u_\theta(x,y) = x(1-x)\,y(1-y)\,\widehat{u}_\theta(x,y).
+	\]
+
+	\vspace{0.4em}
+	\textbf{Network:} $\widehat{u}_\theta \colon \mathbb{R}^2\to\mathbb{R}$ is a 2-layer MLP,
+	\[
+		2 \xrightarrow{\;\tanh\;} 100 \xrightarrow{\;\mathrm{linear}\;} 1.
+	\]
+
+	\vspace{0.4em}
+	\textbf{Loss:} mean squared residual on an interior tensor-product grid
+	($50\times 50$ collocation points, excluding the boundary),
+	\[
+		\mathcal{L}(\theta)
+		= \frac{1}{N}\sum_{i=1}^{N}
+		\bigl(\Delta u_\theta(x_i,y_i) + f(x_i,y_i)\bigr)^2.
+	\]
+
+	\vspace{0.4em}
+	\textbf{Optimization \& evaluation:} same Adam + L-BFGS schedule as the 1D case;
+	relative $L^2$ error measured on a finer $100\times 100$ interior test grid.
+\end{frame}
+
+\begin{frame}{Remarks}
+To understand the performance of the PINNs, it is important to understand how the following factors affect the convergence:  
+\begin{itemize}
+	\item Change the network architecture, e.g., use different activation functions, different number of layers, different number of neurons, etc.
+	\item Change the target function to higher frequency to explore frequency principle. 
+	\item Change the number of collocation points to explore the convergence rate.
+\end{itemize}
+\vfill 
+\begin{itemize}
+	\scriptsize
+	\item Ma, Y., Xu, Z. Q. J., \& Zhang, J. (2021). Frequency principle in deep learning beyond gradient-descent-based training. arXiv preprint arXiv:2101.00747.
+	\item Hong, Q., Siegel, J. W., Tan, Q., \& Xu, J. (2022). On the activation function dependence of the spectral bias of neural networks. arXiv preprint arXiv:2208.04924.
+\end{itemize}
+\end{frame}
+
+\section{Summary}
+\begin{frame}{Summary}
+	\begin{itemize}
+		\item Both codes solve \textbf{stationary elliptic} problems with manufactured solutions
+		\item Boundary conditions are enforced through the hard constraint. 
+		\item PDE residuals are computed with \textbf{automatic differentiation} (second derivatives in 1D; Laplacian in 2D)
+	\end{itemize}
+	\vspace{0.4cm}
+	\textbf{Question:} Do we have other training methods to solve PDEs using neural networks that can give us better convergence?
+	\vfill 
+	You are encouraged to explore the following papers to gain more insights into training neural networks for solving PDEs: 
+	\begin{itemize}
+		\scriptsize 
+		\item Mao, T., Xu, J., \& Xu, X. (2026). Solving High-Dimensional PDEs Using Linearized Neural Networks. arXiv preprint arXiv:2601.11771.
+		\item Xu, J., \& Xu, X. (2025). Randomized greedy algorithms for neural network optimization in solving partial differential equations. Journal of Scientific Computing, 105(1), 26.
+		\item Siegel, J. W., Hong, Q., Jin, X., Hao, W., \& Xu, J. (2023). Greedy training algorithms for neural networks and applications to PDEs. Journal of Computational Physics, 484, 112084.
+		\item Park, J., Xu, J., \& Xu, X. (2022). A neuron-wise subspace correction method for the finite neuron method. arXiv preprint arXiv:2211.12031.
+	\end{itemize} 
+\end{frame}
+
+\begin{frame}
+	\centering
+	\Large Thank you!
+\end{frame}
+
+\end{document}
